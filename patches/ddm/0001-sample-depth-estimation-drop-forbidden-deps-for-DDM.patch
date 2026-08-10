@@ -1,0 +1,49 @@
+From 861d1c6ce213f7502364007b075a8f68df220972 Mon Sep 17 00:00:00 2001
+From: hangshen <hangshen@qti.qualcomm.com>
+Date: Thu, 6 Aug 2026 16:01:48 +0800
+Subject: [PATCH] sample-depth-estimation: drop forbidden deps for DDM
+
+Remove python3-opencv, ros-jazzy-cv-bridge and ros-jazzy-image-publisher
+from runtime Depends (and the matching exec_depend tags in package.xml)
+so the DDM image does not pull in license-forbidden packages.
+
+Change-Id: Ibd441e81e8b3d68040ba733ee44e8e75fe5ab0b1
+---
+ debian/control | 2 +-
+ package.xml    | 3 ---
+ 2 files changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/debian/control b/debian/control
+index b3b9782..eb5e3cb 100644
+--- a/debian/control
++++ b/debian/control
+@@ -8,5 +8,5 @@ Standards-Version: 3.9.2
+ 
+ Package: ros-jazzy-sample-depth-estimation
+ Architecture: any
+-Depends: ${python3:Depends}, ${misc:Depends}, python3-numpy, python3-opencv, ros-jazzy-ament-index-python, ros-jazzy-cv-bridge, ros-jazzy-image-publisher, ros-jazzy-qrb-ros-camera, ros-jazzy-qrb-ros-nn-inference, ros-jazzy-rclpy, ros-jazzy-sensor-msgs
++Depends: ${python3:Depends}, ${misc:Depends}, python3-numpy, ros-jazzy-ament-index-python, ros-jazzy-qrb-ros-camera, ros-jazzy-qrb-ros-nn-inference, ros-jazzy-rclpy, ros-jazzy-sensor-msgs
+ Description: Provide ros node depth estimator pipeline
+diff --git a/package.xml b/package.xml
+index 802bfe5..b1fcbf5 100755
+--- a/package.xml
++++ b/package.xml
+@@ -11,15 +11,12 @@
+   <buildtool_depend>ament_cmake_python</buildtool_depend>
+ 
+   <!-- Execution dependencies -->
+-  <exec_depend>python3-opencv</exec_depend>
+   <exec_depend>rclpy</exec_depend>
+   <exec_depend>ament_index_python</exec_depend>
+   <exec_depend>sensor_msgs</exec_depend>
+   <exec_depend>python3-numpy</exec_depend>
+-  <exec_depend>image_publisher</exec_depend>
+   <exec_depend>qrb_ros_nn_inference</exec_depend>
+   <exec_depend>qrb_ros_camera</exec_depend>
+-  <exec_depend>cv_bridge</exec_depend>
+ 
+   <!-- Test dependencies -->  
+   <test_depend>ament_copyright</test_depend>
+-- 
+2.43.0
+
