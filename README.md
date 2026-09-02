@@ -1,182 +1,138 @@
-
-
 <div>
   <h1>AI Sample Depth Estimation</h1>
   <p align="center">
   </p>
 </div>
 
-![](https://github.com/qualcomm-qrb-ros/qrb_ros_samples/blob/gif/ai_vision/sample_depth_estimation/resource/depth_result.gif)
+![depth result](./resource/depth_result.gif)
 
 ---
 
 ## 👋 Overview
 
-- This sample allows you to input an RGB image named `input_image.jpg` or subscribe to the ROS topic `/cam0_stream1` from the QRB ROS Camera (`qrb_ros_camera`). It then uses QNN to perform model inference and publishes the result on the `/depth_map` ROS topic containing per-pixel depth values.
-- The model is sourced from [Depth Anything V2](https://aihub.qualcomm.com/iot/models/depth_anything_v2?searchTerm=depth&domain=Computer+Vision), a deep convolutional neural network model for depth estimation.
+The depth estimation demo is a Python-based ROS 2 pipeline that runs the Depth Anything V2 model on the Qualcomm AI accelerator through QNN.
 
-![image-20250723181610392](./resource/depth_estimation_architecture.jpg)
+- It takes an RGB image as input, either from a local file such as `input_image.jpg` published by the `image_publisher` node, or from the ROS topic `cam0_stream1` published by the QRB ROS Camera (`qrb_ros_camera`).
+- It preprocesses the image, sends it to the QRB ROS NN inference node, and postprocesses the output tensor.
+- The result is published on the `depth_map` ROS topic as an image containing per-pixel depth values.
+
+![architecture](./resource/depth_estimation_architecture.jpg)
 
 | Node Name | Function |
 | --------- | -------- |
-| [qrb ros camera](https://github.com/qualcomm-qrb-ros/qrb_ros_camera) | Qualcomm ROS 2 package that captures images with parameters and publishes them to ROS topics. |
-| image publisher | Publishes image data to a ROS topic—can be camera frames, local files, or processed outputs. |
-| sample depth estimation | Subscribes to input images for preprocessing, then performs postprocessing on the output tensor published by the qrb ros nn interface node. |
-| [qrb ros nn interface](https://github.com/qualcomm-qrb-ros/qrb_ros_nn_inference) | Loads a trained AI model, receives preprocessed images, performs inference, and publishes results. |
+| `qrb_ros_camera` | Qualcomm ROS 2 package that captures images with configurable parameters and publishes them to ROS topics. |
+| `image_publisher` | Publishes image data from a local file to a ROS topic, used when no camera is connected. |
+| `sample_depth_estimation` | Subscribes to input images for preprocessing, then performs postprocessing on the output tensor published by the QRB ROS NN inference node. |
+| `qrb_ros_nn_inference` | Loads a trained AI model, receives preprocessed tensors, performs inference, and publishes the results. |
 
 ## 🔎 Table of contents
 
-  * [Used ROS Topics](#-used-ros-topics)
-  * [Supported targets](#-supported-targets)
-  * [Installation](#-installation)
-  * [Usage](#-usage)
-  * [Build from source](#-build-from-source)
-  * [Contributing](#-contributing)
-  * [Contributors](#%EF%B8%8F-contributors)
-  * [FAQs](#-faqs)
-  * [License](#-license)
+- [👋 Overview](#-overview)
+- [🔎 Table of contents](#-table-of-contents)
+- [⚓ Used ROS Topics](#-used-ros-topics)
+- [🚀 Out-of-Box Usage](#-out-of-box-usage)
+  - [Prerequisites](#prerequisites)
+  - [Run on device](#run-on-device)
+- [👨‍💻Visualization:](#visualization)
+- [👨‍💻 Build from source](#-build-from-source)
+- [❔ FAQs](#-faqs)
+- [📜 License](#-license)
 
-## ⚓ Used ROS Topics 
+## ⚓ Used ROS Topics
+
+All pipeline nodes run in the `sample_container` namespace, except `image_publisher`, which publishes on the global `/image_raw` topic.
 
 | ROS Topic | Type | Description |
 | --------- | ---- | ----------- |
-| `/image_raw` | `<sensor_msgs.msg.Image>` | Published image information |
-| `/qrb_inference_input_tensor` | `<qrb_ros_tensor_list_msgs.msg.TensorList>` | Preprocessed message |
-| `/qrb_inference_output_tensor` | `<qrb_ros_tensor_list_msgs.msg.TensorList>` | Neural network interface result with model |
-| `/depth_map` | `<sensor_msgs.msg.Image>` | Depth map result |
-
-## 🎯 Supported targets
-
-<table>
-  <tr>
-    <th>Development Hardware</th>
-    <th>Hardware Overview</th>
-  </tr>
-  <tr>
-    <td>Qualcomm Dragonwing™ IQ-9075 EVK</td>
-    <td>
-      <a href="https://www.qualcomm.com/products/internet-of-things/industrial-processors/iq9-series/iq-9075">
-        <img src="https://s7d1.scene7.com/is/image/dmqualcommprod/dragonwing-IQ-9075-EVK?$QC_Responsive$&fmt=png-alpha" width="160">
-      </a>
-    </td>
-  </tr>
-  <tr>
-    <td>GMSL Camera Support</td>
-    <td>LI-VENUS-OX03F10-OAX40-GM2A-118H(YUV)</td>
-  </tr>
-</table>
-
-## ✨ Installation
-
-> [!IMPORTANT]
-> The following steps need to be run on **Qualcomm Ubuntu** and **ROS Jazzy**.<br>
-> Refer to [Install Ubuntu on Qualcomm IoT Platforms](https://ubuntu.com/download/qualcomm-iot) and [Install ROS Jazzy](https://docs.ros.org/en/jazzy/index.html) to setup environment. <br>
-> For Qualcomm Linux, please check out the [Qualcomm Intelligent Robotics Product SDK](https://docs.qualcomm.com/bundle/publicresource/topics/80-70018-265/introduction_1.html?vproduct=1601111740013072&version=1.4&facet=Qualcomm%20Intelligent%20Robotics%20Product%20(QIRP)%20SDK) documents.
+| `/image_raw` | `<sensor_msgs/msg/Image>` | Input image published by the `image_publisher` node |
+| `/sample_container/cam0_stream1` | `<sensor_msgs/msg/Image>` | Input image stream published by `qrb_ros_camera` |
+| `/sample_container/qrb_inference_input_tensor` | `<qrb_ros_tensor_list_msgs/msg/TensorList>` | Preprocessed input tensor sent to the NN inference node |
+| `/sample_container/qrb_inference_output_tensor` | `<qrb_ros_tensor_list_msgs/msg/TensorList>` | Raw model output tensor published by the NN inference node |
+| `/sample_container/depth_map` | `<sensor_msgs/msg/Image>` | Depth map result |
 
 
-## 🚀 Usage
-<details>
-  <summary>Install via Debian package</summary>
+## 🚀 Out-of-Box Usage
 
-## 👨‍💻 Prerequisites
+### Prerequisites
 
-- Add qcom ppa repository source:
-```bash
-sudo add-apt-repository ppa:ubuntu-qcom-iot/qcom-ppa
-sudo add-apt-repository ppa:ubuntu-qcom-iot/qirp
-sudo apt update
-```
+- The AI model is installed to `/opt/model/Depth-Anything-V2.bin` when the Debian package is installed. If that file is missing, download the `Depth-Anything-V2.bin` model to `/opt/model/` manually before running the sample.
 
-- Install the depth estimation Debian package: 
-```bash
+  ```bash
+  sudo mkdir -p /opt/model && cd /opt/model
+  sudo wget https://huggingface.co/qualcomm/Depth-Anything-V2/resolve/19ce3645e11de17eed7e869eebcc07dd352834f3/Depth-Anything-V2.bin?download=true -O Depth-Anything-V2.bin
+  ```
 
-sudo apt install -y ros-jazzy-sample-depth-estimation
-```
+- Export the NN inference required variables.
 
-- Run sample depth estimation:
-```bash
-source /opt/ros/jazzy/setup.bash
-ros2 launch sample_depth_estimation launch_with_image_publisher.py
-```
+  ```bash
+  export ADSP_LIBRARY_PATH="/usr/lib/rfsa/adsp;/usr/lib/rfsa/adsp/hexagon-v81"
+  export CDSP_LIBRARY_PATH="/vendor/dsp/cdsp0;/usr/lib/rfsa/adsp/hexagon-v81"
+  ```
 
-- You can replace this with a custom image file or model path:
-```bash
-ros2 launch sample_depth_estimation launch_with_image_publisher.py image_path:=<your local image path> model_path:=<your local model path>
-```
+### Run on device
 
-- You can also launch with `qrb_ros_camera` if you connect a GMSL camera:
-```bash
-ros2 launch sample_depth_estimation launch_with_qrb_ros_camera.py
-```
+1. Run the sample with a local image file:
 
-## 👨‍💻 Visualization
+   ```bash
+   source /opt/ros/jazzy/setup.bash
+   ros2 launch sample_depth_estimation launch_with_image_publisher.py
+   ```
 
-- You can then check the ROS topic `/sample_container/depth_map` in rqt. 
-Please refer to the [ROS 2 Jazzy documentation](https://docs.ros.org/en/jazzy/Tutorials/Beginner-CLI-Tools/Introducing-Turtlesim/Introducing-Turtlesim.html) to install rqt.
+   With the default parameters, this launch script publishes the built-in `input_image.jpg` at 10 Hz.
 
-</details>
+2. You can override the image file and the model path:
 
-<details>
-  <summary>Build from source usage details</summary>
+   ```bash
+   ros2 launch sample_depth_estimation launch_with_image_publisher.py image_path:=<your local image path> model_path:=<your local model path>
+   ```
 
-## 👨‍💻 Prerequisites
+3. If a GMSL camera is connected, you can launch the sample with `qrb_ros_camera` instead:
 
-- Download the Depth Anything V2 model:
-```bash
-sudo mkdir -p /opt/model && cd /opt/model
-sudo wget https://huggingface.co/qualcomm/Depth-Anything-V2/resolve/19ce3645e11de17eed7e869eebcc07dd352834f3/Depth-Anything-V2.bin?download=true -O Depth-Anything-V2.bin
-```
+   ```bash
+   source /opt/ros/jazzy/setup.bash
+   ros2 launch sample_depth_estimation launch_with_qrb_ros_camera_args.py
+   ```
 
-- Add qcom ppa repository source:
-```bash
-sudo add-apt-repository ppa:ubuntu-qcom-iot/qcom-ppa
-sudo add-apt-repository ppa:ubuntu-qcom-iot/qirp
-sudo apt update
-```
+## 👨‍💻Visualization: 
 
-- Install QRB ROS packages:
-```bash
-sudo apt install -y ros-jazzy-qrb-ros-camera ros-jazzy-qrb-ros-nn-inference ros-jazzy-qrb-ros-tensor-list-msgs
-sudo apt install -y ros-dev-tools
-sudo rosdep init
-rosdep update
-```
+You can then check the ROS topic `/sample_container/depth_map` in `rqt`. Please refer to the ROS 2 Jazzy official documentation to install rqt.
 
 ## 👨‍💻 Build from source
 
-- Download source code from the qrb-ros-sample repository:
-```bash
-mkdir -p ~/qrb_ros_sample_ws/src && cd ~/qrb_ros_sample_ws/src
-git clone -b jazzy-rel https://github.com/qualcomm-qrb-ros/qrb_ros_samples.git
-```
+Source code is located at `sources/quic-qrb-ros/qrb_ros_samples/sample_depth_estimation/` in the downstream Ubuntu workspace.
 
-- Build the sample from source code:
-```bash
-cd ~/qrb_ros_sample_ws/src/qrb_ros_samples/ai_vision/sample_depth_estimation
+1. Build the package:
 
-rosdep install --from-paths . --ignore-src --rosdistro jazzy -y --skip-keys "qrb_ros_camera qrb_ros_nn_inference"
-source /opt/ros/jazzy/setup.bash
-colcon build
-source install/setup.bash
-```
+   ```bash
+   cd build-utils/ubuntu/
+   python3 build.py --gen-debians --package ros-jazzy-sample-depth-estimation
+   ```
 
-- Run sample depth estimation:
-```bash
-source /opt/ros/jazzy/setup.bash
-ros2 launch sample_depth_estimation launch_with_image_publisher.py
-```
+   Built `.deb` files are output to:
 
-- You can replace this with a custom image file or model path:
-```bash
-ros2 launch sample_depth_estimation launch_with_image_publisher.py image_path:=<your local image path> model_path:=<your local model path>
-```
+   ```text
+   <workspace>/debian_packages/oss/ros-jazzy-sample-depth-estimation/
+   ```
 
-- You can also launch with `qrb_ros_camera` if you connect a GMSL camera:
-```bash
-ros2 launch sample_depth_estimation launch_with_qrb_ros_camera.py
-```
+2. Copy the `.deb` file to the target device:
 
-- When using this launch script, it uses the default parameters; it will send the local `input_image.jpg` file at a publishing rate of 10 Hz. 
+   ```bash
+   scp <workspace>/debian_packages/oss/ros-jazzy-sample-depth-estimation/ros-jazzy-sample-depth-estimation_*.deb <user>@<device-ip>:~
+   ```
+
+3. Install the `.deb` package on the target device:
+
+   ```bash
+   sudo apt install ./ros-jazzy-sample-depth-estimation_*.deb
+   ```
+
+Refer to [Usage](#-usage) to run the depth estimation sample.
+
+## ❔ FAQs
+
+<details>
+<summary>How can I change the image publishing rate?</summary><br>
+The input rate is set by the <code>rate</code> parameter of the <code>image_publisher</code> node in <code>launch/launch_with_image_publisher.py</code>. Change the <code>10.0</code> value to publish at a different frequency:
 
 ```python
 image_path_arg = DeclareLaunchArgument(
@@ -186,48 +142,24 @@ image_path_arg = DeclareLaunchArgument(
 )
 
 # Node for image_publisher
-image_publisher_node = Node(
-    package='image_publisher',  
-    executable='image_publisher_node', 
-    namespace=namespace,
-    name='image_publisher_node', 
-    output='screen', 
+image_publish_node = Node(
+    package='image_publisher',
+    executable='image_publisher_node',
+    name='image_publisher_node',
+    output='screen',
     parameters=[
-        {'filename': image_path},  
+        {'filename': image_path},
         {'rate': 10.0},  # Set the publishing rate to 10 Hz
-    ]
+    ],
 )
 ```
 
+When launching with `qrb_ros_camera`, set the `fps` value of `stream1` in `launch/launch_with_qrb_ros_camera.py` instead.
 </details>
-
-## 🤝 Contributing
-
-We love community contributions! Get started by reading our [CONTRIBUTING.md](CONTRIBUTING.md).<br>
-Feel free to create an issue for bug reports, feature requests, or any discussion 💡.
-
-## ❤️ Contributors
-
-Thanks to all our contributors who have helped make this project better!
-
-<table>
-  <tr>
-    <td style="text-align: center;">
-      <a href="https://github.com/DotaIsMind">
-        <img src="https://github.com/DotaIsMind.png" width="100" height="100" alt="teng"/>
-        <br />
-        <sub><b>teng</b></sub>
-      </a>
-    </td>
-  </tr>
-</table>
-
-
-## ❔ FAQs
 
 <details>
 <summary>How can I get the raw output of the QNN inference node?</summary><br>
-Comment out the following code in `depth_estimation_node.py` to get the raw output of the QNN inference node:
+Comment out the following code in <code>depth_estimation_node.py</code> to get the raw output of the QNN inference node:
 
 ```python
 # Normalize to [0,255]
@@ -236,7 +168,11 @@ colored = cv2.applyColorMap(normalized.astype(np.uint8), cv2.COLORMAP_INFERNO)
 ```
 </details>
 
+<details>
+<summary>The sample starts but no depth map is published.</summary><br>
+Check that the model file exists at <code>/opt/model/Depth-Anything-V2.bin</code>, or pass a valid path with the <code>model_path</code> launch argument. Also confirm the input topic is active with <code>ros2 topic hz /image_raw</code> (local image) or <code>ros2 topic hz /sample_container/cam0_stream1</code> (camera).
+</details>
 
 ## 📜 License
 
-Project is licensed under the [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) License. See [LICENSE](../../LICENSE) for the full license text.
+Project is licensed under the BSD-3-Clause-Clear License. See [LICENSE](../../LICENSE) for the full license text.
